@@ -1,6 +1,8 @@
 import streamlit as st
 import os
 from openai import OpenAI
+from datetime import datetime
+import json
 
 # 设置页面配置项
 st.set_page_config(
@@ -10,6 +12,27 @@ st.set_page_config(
     initial_sidebar_state="expanded",  #侧边栏状态
     menu_items={}
 )
+
+# 生成会话标识
+def generate_session_id():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+# 保存当前会话信息
+def save_session():
+    if st.session_state.session_id:
+        session_data = {
+            "nick_name": st.session_state.nick_name,
+            "character": st.session_state.character,
+            "session_id": st.session_state.session_id,
+            "messages": st.session_state.messages
+        }
+
+        # 如果 sessions 目录不存在则创建
+        if not os.path.exists("sessions"):
+            os.mkdir("sessions")
+
+        with open(f"sessions/{st.session_state.session_id}.json", "w", encoding="utf-8") as f:
+            json.dump(session_data, f, ensure_ascii=False, indent=2)
 
 # 大标题
 st.title("你的AI网文书友")
@@ -42,6 +65,9 @@ if "nick_name" not in st.session_state:
 # 初始化性格
 if "character" not in st.session_state:
     st.session_state.character = "中二热血少年"
+# 会话标识（系统时）
+if "session_id" not in st.session_state:
+    st.session_state.session_id = generate_session_id()
 
 # 展示聊天信息
 for message in st.session_state.messages:
@@ -51,6 +77,22 @@ for message in st.session_state.messages:
 
 # 左侧侧边栏
 with st.sidebar:
+    # 会话信息
+    st.subheader("AI控制面板")
+    # 新建会话按钮
+    if st.button("新建会话", width="stretch", icon="👋"):
+        # 1.保存当前会话
+        save_session()
+
+        # 2.创建新会话
+        if st.session_state.messages: # 如果当前会话无内容（还未使用），则不创建新会话
+            st.session_state.messages = []
+            st.session_state.session_id = generate_session_id()
+            save_session()
+
+        # 3.重新运行刷新页面
+        st.rerun()
+
     st.subheader("书友信息")
     # 昵称输入框
     nick_name = st.text_input("昵称", placeholder="请输入书友昵称", value=st.session_state.nick_name)
