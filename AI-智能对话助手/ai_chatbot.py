@@ -15,7 +15,7 @@ st.set_page_config(
 
 # 生成会话标识
 def generate_session_id():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
 # 保存当前会话信息
 def save_session():
@@ -33,6 +33,42 @@ def save_session():
 
         with open(f"sessions/{st.session_state.session_id}.json", "w", encoding="utf-8") as f:
             json.dump(session_data, f, ensure_ascii=False, indent=2)
+
+# 加载会话列表
+def load_sessions():
+    session_list = []
+    if os.path.exists("sessions"):
+        for filename in os.listdir("sessions"):
+            if filename.endswith(".json"):
+                session_list.append(filename[:-5])
+    session_list.reverse()
+    return session_list
+
+# 加载指定会话
+def load_session(session_id):
+    try:
+        if os.path.exists(f"sessions/{session_id}.json"):
+            with open(f"sessions/{session_id}.json", "r", encoding="utf-8") as f:
+                session_data = json.load(f)
+                st.session_state.messages = session_data["messages"]
+                st.session_state.nick_name = session_data["nick_name"]
+                st.session_state.character = session_data["character"]
+                st.session_state.session_id = session_data["session_id"]
+    except Exception:
+        st.error(f"加载会话失败！")
+
+# 删除会话
+def delete_session(session_id):
+    try:
+        if os.path.exists(f"sessions/{session_id}.json"):
+            os.remove(f"sessions/{session_id}.json")
+            # 如果删除当前会话，则清空会话列表并构建一个新的空会话
+            if session_id == st.session_state.session_id:
+                st.session_state.messages = []
+                st.session_state.session_id = generate_session_id()
+    except Exception:
+        st.error(f"删除会话失败！")
+
 
 # 大标题
 st.title("你的AI网文书友")
@@ -70,6 +106,7 @@ if "session_id" not in st.session_state:
     st.session_state.session_id = generate_session_id()
 
 # 展示聊天信息
+st.text(f"会话名称：{st.session_state.session_id}")
 for message in st.session_state.messages:
     # 不展示系统提示
     if message["role"] != "system":
@@ -93,6 +130,25 @@ with st.sidebar:
         # 3.重新运行刷新页面
         st.rerun()
 
+    # 会话历史
+    st.text("会话历史")
+    session_list = load_sessions()
+    for session_id in session_list:
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            if st.button(session_id, key=f"load_{session_id}", width="stretch", icon="📂", type="primary" if session_id == st.session_state.session_id else "secondary"):
+                # 加载会话
+                load_session(session_id)
+                st.rerun()
+        with col2:
+            if st.button("", key=f"delete_{session_id}", width="stretch", icon="🗑️"):
+                # 删除会话
+                delete_session(session_id)
+                st.rerun()
+
+    st.divider()  # 分隔线
+
+    # 书友信息
     st.subheader("书友信息")
     # 昵称输入框
     nick_name = st.text_input("昵称", placeholder="请输入书友昵称", value=st.session_state.nick_name)
@@ -139,3 +195,5 @@ if prompt:
 
     # 保存大模型返回结果
     st.session_state.messages.append({"role": "assistant", "content": full_response})
+    # 保存会话
+    save_session()
